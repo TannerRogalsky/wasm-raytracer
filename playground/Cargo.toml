@@ -1,0 +1,11 @@
+[package]
+name = "playground"
+version = "0.1.0"
+authors = ["Tanner Rogalsky <tanner@tannerrogalsky.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+wasm-executor = { path = "../wasm-executor" }
+futures = { version = "0.3", features = ["thread-pool"] }
