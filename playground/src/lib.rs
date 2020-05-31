@@ -23,8 +23,26 @@ pub fn main() {
 
     let concurrency = 5;
     let thread_pool = build(rayon::ThreadPoolBuilder::new().num_threads(concurrency));
-    thread_pool.spawn(|| {
+    
+    let el = winit::event_loop::EventLoop::new();
+    let (send, recv) = std::sync::mpsc::channel();
+
+    thread_pool.spawn(move || {
+        let mut i = 2u64;
+        for v in 0..10000 {
+            i += v;
+        }
+        send.send(i).expect("failed to send");
         log::info!("what's good?");
     });
-    log::info!("ayy");
+
+    el.run(move |_e, _, cx| {
+        use winit::event_loop::ControlFlow;
+        *cx = ControlFlow::Poll;
+
+        if let Ok(i) = recv.try_recv() {
+            log::info!("{}", i);
+            *cx = ControlFlow::Exit;
+        }
+    });
 }
