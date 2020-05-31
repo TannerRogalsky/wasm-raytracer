@@ -16,6 +16,10 @@ module.exports = {
       {
         test: /\.wasm$/,
         type: "javascript/auto"
+      },
+      {
+        test: require.resolve("../www/worker.js"),
+        use: "worker-loader"
       }
     ]
   },
