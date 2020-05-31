@@ -9,8 +9,20 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use web_sys::{DedicatedWorkerGlobalScope, MessageEvent};
-use web_sys::{ErrorEvent, Event, Worker};
+use web_sys::{DedicatedWorkerGlobalScope, ErrorEvent, Event, MessageEvent, Worker};
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(extends = Worker)]
+    pub type WorkerTemplate;
+
+    #[wasm_bindgen(constructor)]
+    fn new() -> WorkerTemplate;
+}
+
+// thread_local! {
+//     static WORKER_TEMPLATE: RefCell<Option<WorkerTemplate>> = RefCell::new(None);
+// }
 
 #[wasm_bindgen]
 pub struct WorkerPool {
@@ -28,6 +40,11 @@ struct Work {
 
 #[wasm_bindgen]
 impl WorkerPool {
+    // #[wasm_bindgen]
+    // pub fn set_worker_template(template: WorkerTemplate) {
+    //     WORKER_TEMPLATE.with(|t| *t.borrow_mut() = Some(template));
+    // }
+
     /// Creates a new `WorkerPool` which immediately creates `initial` workers.
     ///
     /// The pool created here can be used over a long period of time, and it
@@ -44,8 +61,7 @@ impl WorkerPool {
             state: Rc::new(PoolState {
                 workers: RefCell::new(Vec::with_capacity(initial)),
                 callback: Closure::wrap(Box::new(|event: Event| {
-                    console_log!("unhandled event: {}", event.type_());
-                    crate::logv(&event);
+                    log::warn!("unhandled event: {}", event.type_());
                 }) as Box<dyn FnMut(Event)>),
             }),
         };
@@ -67,14 +83,10 @@ impl WorkerPool {
     /// Returns any error that may happen while a JS web worker is created and a
     /// message is sent to it.
     fn spawn(&self) -> Result<Worker, JsValue> {
-        console_log!("spawning new worker");
-        // TODO: what do do about `./worker.js`:
-        //
-        // * the path is only known by the bundler. How can we, as a
-        //   library, know what's going on?
-        // * How do we not fetch a script N times? It internally then
-        //   causes another script to get fetched N times...
-        let worker = Worker::new("./worker.js")?;
+        log::trace!("spawning new worker");
+
+        // let worker = WORKER_TEMPLATE.with(|t| t.borrow().unwrap().new()) ;
+        let worker: Worker = WorkerTemplate::new().into();
 
         // With a worker spun up send it the module/memory so it can start
         // instantiating the wasm module. Later it might receive further
@@ -147,7 +159,7 @@ impl WorkerPool {
         let slot2 = reclaim_slot.clone();
         let reclaim = Closure::wrap(Box::new(move |event: Event| {
             if let Some(error) = event.dyn_ref::<ErrorEvent>() {
-                console_log!("error in worker: {}", error.message());
+                log::error!("error in worker: {}", error.message());
                 // TODO: this probably leaks memory somehow? It's sort of
                 // unclear what to do about errors in workers right now.
                 return;
@@ -163,8 +175,7 @@ impl WorkerPool {
                 return;
             }
 
-            console_log!("unhandled event: {}", event.type_());
-            crate::logv(&event);
+            log::warn!("unhandled event: {}", event.type_());
             // TODO: like above, maybe a memory leak here?
         }) as Box<dyn FnMut(Event)>);
         worker.set_onmessage(Some(reclaim.as_ref().unchecked_ref()));

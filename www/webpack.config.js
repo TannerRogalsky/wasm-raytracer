@@ -15,8 +15,7 @@ module.exports = {
     rules: [
       {
         test: /\.wasm$/,
-        type: "javascript/auto",
-        use: "file-loader"
+        type: "javascript/auto"
       }
     ]
   },

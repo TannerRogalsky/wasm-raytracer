@@ -28,13 +28,15 @@
   "homepage": "https://github.com/rustwasm/create-wasm-app#readme",
   "devDependencies": {
     "copy-webpack-plugin": "^5.0.0",
+    "exports-loader": "^0.7.0",
     "file-loader": "^6.0.0",
     "raw-loader": "^4.0.1",
     "webpack": "^4.29.3",
     "webpack-cli": "^3.1.0",
-    "webpack-dev-server": "^3.1.5"
+    "webpack-dev-server": "^3.1.5",
+    "worker-loader": "^2.0.0"
   },
   "dependencies": {
-    "wasm-executor": "file:../pkg"
+    "playground": "file:../pkg"
   }
 }

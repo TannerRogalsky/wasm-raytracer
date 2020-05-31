@@ -4,8 +4,12 @@ version = "0.1.0"
 authors = ["Tanner Rogalsky <tanner@tannerrogalsky.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 wasm-executor = { path = "../wasm-executor" }
-futures = { version = "0.3", features = ["thread-pool"] }
+log = "0.4"
+wasm-logger = "0.2"
+console_error_panic_hook = "0.1"
+wasm-bindgen = "0.2"

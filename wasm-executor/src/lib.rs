@@ -1,17 +1,8 @@
-use wasm_bindgen::prelude::*;
 use std::sync::atomic::{AtomicU32, Ordering};
+use wasm_bindgen::prelude::*;
 
-pub struct ThreadPool {
-    workers: Vec<web_sys::Worker>
-}
-
-impl ThreadPool {
-    pub fn new() -> Self {
-        Self {
-            workers: vec![]
-        }
-    }
-}
+mod pool;
+pub use pool::WorkerPool;
 
 static COUNTER: AtomicU32 = AtomicU32::new(0);
 
@@ -21,8 +12,18 @@ pub fn incr() {
 }
 
 #[wasm_bindgen]
-pub fn load() -> u32 {
+pub fn load_state() -> u32 {
     COUNTER.load(Ordering::SeqCst)
+}
+
+#[wasm_bindgen]
+pub fn module() -> JsValue {
+    wasm_bindgen::module()
+}
+
+#[wasm_bindgen]
+pub fn memory() -> JsValue {
+    wasm_bindgen::memory()
 }
 
 #[cfg(test)]
