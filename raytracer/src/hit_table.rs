@@ -2,13 +2,13 @@ extern crate cgmath;
 
 use super::Material;
 use cgmath::Vector3;
-use std::rc::Rc;
+use std::sync::Arc as Rc;
 
 pub struct HitRecord<T, R> {
     t: T,
     p: Vector3<T>,
     normal: Vector3<T>,
-    material: Rc<dyn super::Material<T, R>>,
+    material: Rc<dyn super::Material<T, R> + Send + Sync>,
 }
 
 impl<T: std::marker::Copy, R> HitRecord<T, R> {
@@ -16,7 +16,7 @@ impl<T: std::marker::Copy, R> HitRecord<T, R> {
         t: T,
         p: Vector3<T>,
         normal: Vector3<T>,
-        material: Rc<dyn super::Material<T, R>>,
+        material: Rc<dyn super::Material<T, R> + Send + Sync>,
     ) -> Self {
         Self {
             t,
@@ -50,7 +50,7 @@ impl<T: std::marker::Copy, R> HitRecord<T, R> {
         self.normal = normal;
     }
 
-    pub fn get_material(&self) -> &Rc<dyn Material<T, R>> {
+    pub fn get_material(&self) -> &Rc<dyn Material<T, R> + Send + Sync> {
         &self.material
     }
 }
@@ -60,7 +60,7 @@ pub trait HitTable<T, R> {
 }
 
 pub struct HitTableList<T, R> {
-    list: std::vec::Vec<Box<dyn HitTable<T, R>>>,
+    list: std::vec::Vec<Box<dyn HitTable<T, R> + Send + Sync>>,
 }
 
 impl<T, R> HitTableList<T, R> {
@@ -68,7 +68,7 @@ impl<T, R> HitTableList<T, R> {
         HitTableList { list: vec![] }
     }
 
-    pub fn add(&mut self, ht: Box<dyn HitTable<T, R>>) {
+    pub fn add(&mut self, ht: Box<dyn HitTable<T, R> + Send + Sync>) {
         self.list.push(ht)
     }
 }

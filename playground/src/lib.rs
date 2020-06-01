@@ -7,19 +7,24 @@ use glutin as winit;
 use graphics::texture::{Texture, TextureUpdate};
 use graphics::vertex::Vertex;
 use wasm_bindgen::prelude::*;
+use rayon::prelude::*;
+use rand::prelude::SmallRng;
 
 #[cfg(target_arch = "wasm32")]
-fn build<T>(builder: rayon::ThreadPoolBuilder<T>) -> rayon::ThreadPool {
-    let pool = wasm_executor::WorkerPool::new(5).expect("pool creation failed");
-    builder
+fn build_thread_pool() -> rayon::ThreadPool {
+    let concurrency = web_sys::window().unwrap().navigator().hardware_concurrency() as usize;
+    log::info!("{} threads.", concurrency);
+    let pool = wasm_executor::WorkerPool::new(concurrency).expect("pool creation failed");
+    rayon::ThreadPoolBuilder::new().num_threads(concurrency)
         .spawn_handler(move |thread| Ok(pool.run(|| thread.run()).unwrap()))
         .build()
         .unwrap()
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn build(builder: rayon::ThreadPoolBuilder) -> rayon::ThreadPool {
-    builder.build().unwrap()
+fn build_thread_pool() -> rayon::ThreadPool {
+    let concurrency = num_cpus::get();
+    rayon::ThreadPoolBuilder::new().num_threads(concurrency).build().unwrap()
 }
 
 #[derive(Vertex, Default, Copy, Clone, Debug)]
@@ -36,18 +41,7 @@ pub fn main() {
     #[cfg(target_arch = "wasm32")]
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-    let concurrency = 5;
-    let thread_pool = build(rayon::ThreadPoolBuilder::new().num_threads(concurrency));
-
-    let (send, recv) = std::sync::mpsc::channel();
-    thread_pool.spawn(move || {
-        let mut i = 2u64;
-        for v in 0..10000 {
-            i += v;
-        }
-        send.send(i).expect("failed to send");
-        log::info!("what's good?");
-    });
+    let thread_pool = build_thread_pool();
 
     const WIDTH: u32 = 720;
     const HEIGHT: u32 = 480;
@@ -60,13 +54,12 @@ pub fn main() {
 
     let mut ctx = graphics::Context::new(ctx);
     ctx.set_viewport(0, 0, 1280, 720);
-    // ctx.enable(graphics::Feature::DepthTest(graphics::DepthFunction::Less));
-    // ctx.enable(graphics::Feature::CullFace(
-    //     graphics::CullFace::Back,
-    //     graphics::VertexWinding::CounterClockWise,
-    // ));
+    ctx.enable(graphics::Feature::CullFace(
+        graphics::CullFace::Back,
+        graphics::VertexWinding::CounterClockWise,
+    ));
 
-    let mut app = app::App::new(WIDTH as _, HEIGHT as _);
+    let app = app::App::new(WIDTH as _, HEIGHT as _);
     let pixels = {
         let mut pixels = (0..WIDTH * HEIGHT).map(|i| {
             let x = (i % WIDTH) as usize;
@@ -78,8 +71,7 @@ pub fn main() {
         pixels.shuffle(&mut rng);
         pixels
     };
-
-    // app.draw();
+    let mut pixel_data = vec![raytracer::Pixel::default(); (WIDTH * HEIGHT) as usize];
 
     let image = graphics::image::Image::with_data(
         &mut ctx,
@@ -88,7 +80,7 @@ pub fn main() {
         WIDTH,
         HEIGHT,
         unsafe {
-            let pixels = app.pixels();
+            let pixels = &pixel_data;
             std::slice::from_raw_parts(
                 pixels.as_ptr() as *const u8,
                 pixels.len() * std::mem::size_of::<raytracer::Pixel>(),
@@ -122,16 +114,20 @@ pub fn main() {
     ctx.use_shader(Some(&shader));
     ctx.bind_texture_to_unit(image.get_texture_type(), image.get_texture_key(), 0.into());
 
-    let mut pixel_iterator = pixels.into_iter();
+
+    let (sender, recv) = std::sync::mpsc::channel();
+    thread_pool.spawn(move || {
+        pixels.into_par_iter().for_each_with(sender, |sender, (x, y)| {
+            use rand::SeedableRng;
+            let mut rng = SmallRng::seed_from_u64(0);
+            let pixel = app.draw(x, y, &mut rng);
+            sender.send(((x, y), pixel)).expect("failed to send, the main thread is probably dead");
+        });
+    });
 
     el.run(move |e, _, cx| {
         use winit::{event::*, event_loop::ControlFlow};
         *cx = ControlFlow::Poll;
-
-        if let Ok(i) = recv.try_recv() {
-            log::info!("{}", i);
-            // *cx = ControlFlow::Exit;
-        }
 
         match e {
             Event::WindowEvent { event, .. } => match event {
@@ -144,19 +140,15 @@ pub fn main() {
             Event::MainEventsCleared => window.request_redraw(),
             Event::RedrawRequested(_) => {
                 let mut updated = false;
-                {
-                    let start = instant::Instant::now();
-                    while start.elapsed() < instant::Duration::from_secs_f32(1./30.) {
-                        if let Some((x, y)) = pixel_iterator.next() {
-                            updated = true;
-                            app.draw(x, y);
-                        }
-                    }
+                for ((x, y), pixel) in recv.try_iter() {
+                    updated = true;
+                    let i = x + WIDTH as usize * y;
+                    pixel_data[i] = pixel;
                 }
 
                 if updated {
                     ctx.set_texture_data(image.get_texture_key(), image.get_texture_info(), image.get_texture_type(), Some(unsafe {
-                        let pixels = app.pixels();
+                        let pixels = &pixel_data;
                         std::slice::from_raw_parts(
                             pixels.as_ptr() as *const u8,
                             pixels.len() * std::mem::size_of::<raytracer::Pixel>(),

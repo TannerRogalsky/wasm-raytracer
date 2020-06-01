@@ -3,17 +3,17 @@ extern crate cgmath;
 use super::{HitRecord, HitTable, Material, Ray};
 use cgmath::InnerSpace;
 use std::ops::Range;
-use std::rc::Rc;
+use std::sync::Arc as Rc;
 
 pub struct Sphere<T, R> {
     center: cgmath::Vector3<T>,
     radius: T,
     // this could, theoretically, be a reference but doing the lifetimes sounds unfun
-    material: Rc<dyn Material<T, R>>,
+    material: Rc<dyn Material<T, R> + Send + Sync>,
 }
 
 impl<T, R> Sphere<T, R> {
-    pub fn new(center: cgmath::Vector3<T>, radius: T, material: Rc<dyn Material<T, R>>) -> Self {
+    pub fn new(center: cgmath::Vector3<T>, radius: T, material: Rc<dyn Material<T, R> + Send + Sync>) -> Self {
         Self {
             center,
             radius,

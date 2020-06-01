@@ -1,13 +1,11 @@
 use cgmath::{vec3, ElementWise, InnerSpace, Vector3};
 use rand::prelude::*;
 use raytracer::*;
-use std::rc::Rc;
+use std::sync::Arc as Rc;
 
 pub struct App {
-    pixels: Vec<Pixel>,
     world: HitTableList<f64, SmallRng>,
     camera: Camera<f64>,
-    rng: SmallRng,
     width: usize,
     height: usize,
 }
@@ -16,8 +14,6 @@ impl App {
     pub fn new(width: usize, height: usize) -> Self {
         let mut rng = SmallRng::seed_from_u64(0);
         let world = gen_world(&mut rng);
-
-        let pixels: Vec<Pixel> = vec![Pixel::default(); width * height];
 
         let camera = {
             let origin = vec3(13.0, 2.0, 3.0);
@@ -34,20 +30,14 @@ impl App {
         };
 
         Self {
-            pixels,
             world,
             camera,
-            rng,
             width,
             height,
         }
     }
 
-    pub fn pixels(&self) -> &[Pixel] {
-        &self.pixels
-    }
-
-    fn color(&mut self, r: &Ray<f64>, depth: usize) -> Vector3<f64> {
+    fn color(&self, rng: &mut SmallRng, r: &Ray<f64>, depth: usize) -> Vector3<f64> {
         if depth < 50 {
             match self.world.hit(r, 0.001..std::f64::MAX) {
                 None => {
@@ -57,9 +47,9 @@ impl App {
                 }
                 Some(hit) => {
                     if let Some((attenuation, ray)) =
-                        hit.get_material().scatter(&mut self.rng, r, &hit)
+                        hit.get_material().scatter(rng, r, &hit)
                     {
-                        attenuation.mul_element_wise(self.color(&ray, depth + 1))
+                        attenuation.mul_element_wise(self.color(rng,&ray, depth + 1))
                     } else {
                         vec3(0.0, 0.0, 0.0)
                     }
@@ -70,7 +60,7 @@ impl App {
         }
     }
 
-    pub fn draw(&mut self, x: usize, y: usize) {
+    pub fn draw(&self, x: usize, y: usize, rng: &mut SmallRng) -> Pixel {
         // let u = (x as f64) / (self.width as f64);
         // let v = (y as f64) / (self.height as f64);
         //
@@ -78,17 +68,18 @@ impl App {
         // let col = self.color(&r, 0);
         const AA_STEPS: usize = 50;
         let col = (0..AA_STEPS).fold(vec3(0.0, 0.0, 0.0), |acc, _i| {
-            let u = (x as f64 + self.rng.gen::<f64>()) / (self.width as f64);
-            let v = (y as f64 + self.rng.gen::<f64>()) / (self.height as f64);
+            let u = (x as f64 + rng.gen::<f64>()) / (self.width as f64);
+            let v = (y as f64 + rng.gen::<f64>()) / (self.height as f64);
 
-            let r = self.camera.ray(&mut self.rng, u, v);
-            acc + self.color(&r, 0)
+            let r = self.camera.ray(rng, u, v);
+            acc + self.color(rng,&r, 0)
         }) / AA_STEPS as f64;
 
-        let i = x + self.width * y;
-        self.pixels[i].r = (col.x.sqrt() * 255.99) as u8;
-        self.pixels[i].g = (col.y.sqrt() * 255.99) as u8;
-        self.pixels[i].b = (col.z.sqrt() * 255.99) as u8;
+        Pixel {
+            r: (col.x.sqrt() * 255.99) as u8,
+            g: (col.y.sqrt() * 255.99) as u8,
+            b: (col.z.sqrt() * 255.99) as u8
+        }
     }
 
     // pub fn draw(&mut self) {
