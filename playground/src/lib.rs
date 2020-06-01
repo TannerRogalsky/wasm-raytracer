@@ -13,7 +13,6 @@ use rand::prelude::SmallRng;
 #[cfg(target_arch = "wasm32")]
 fn build_thread_pool() -> rayon::ThreadPool {
     let concurrency = web_sys::window().unwrap().navigator().hardware_concurrency() as usize;
-    log::info!("{} threads.", concurrency);
     let pool = wasm_executor::WorkerPool::new(concurrency).expect("pool creation failed");
     rayon::ThreadPoolBuilder::new().num_threads(concurrency)
         .spawn_handler(move |thread| Ok(pool.run(|| thread.run()).unwrap()))
@@ -53,7 +52,12 @@ pub fn main() {
     let (ctx, window) = window::init_ctx(wb, &el);
 
     let mut ctx = graphics::Context::new(ctx);
-    ctx.set_viewport(0, 0, 1280, 720);
+    {
+        let scale = window.scale_factor();
+        let width = 1280. * scale;
+        let height = 720. * scale;
+        ctx.set_viewport(0, 0, width as _, height as _);
+    }
     ctx.enable(graphics::Feature::CullFace(
         graphics::CullFace::Back,
         graphics::VertexWinding::CounterClockWise,
@@ -133,6 +137,9 @@ pub fn main() {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => *cx = ControlFlow::Exit,
                 WindowEvent::Resized(winit::dpi::PhysicalSize { width, height }) => {
+                    let scale = window.scale_factor();
+                    let width = width as f64 * scale;
+                    let height = height as f64 * scale;
                     ctx.set_viewport(0, 0, width as _, height as _);
                 }
                 _ => {}
