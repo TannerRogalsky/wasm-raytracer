@@ -131,7 +131,8 @@ pub fn main() {
         pixels
             .into_par_iter()
             .for_each_with(sender, |sender, (x, y)| {
-                let mut rng = SmallRng::seed_from_u64(0);
+                let seed = x + (WIDTH as usize) * y;
+                let mut rng = SmallRng::seed_from_u64(seed as _);
                 let pixel = app.draw(x, y, &mut rng);
                 sender
                     .send(((x, y), pixel))
@@ -152,6 +153,15 @@ pub fn main() {
                     let height = height as f64 * scale;
                     ctx.set_viewport(0, 0, width as _, height as _);
                 }
+                WindowEvent::KeyboardInput {
+                    input:
+                        KeyboardInput {
+                            state: ElementState::Pressed,
+                            virtual_keycode: Some(VirtualKeyCode::Escape),
+                            ..
+                        },
+                    ..
+                } => *cx = ControlFlow::Exit,
                 _ => {}
             },
             Event::MainEventsCleared => window.request_redraw(),
