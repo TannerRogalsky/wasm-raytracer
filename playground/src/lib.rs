@@ -4,7 +4,7 @@ mod window;
 #[cfg(not(target_arch = "wasm32"))]
 use glutin as winit;
 
-use graphics::texture::Texture;
+use graphics::texture::{Texture, TextureUpdate};
 use graphics::vertex::Vertex;
 use wasm_bindgen::prelude::*;
 
@@ -49,8 +49,8 @@ pub fn main() {
         log::info!("what's good?");
     });
 
-    const WIDTH: u32 = 200;
-    const HEIGHT: u32 = 100;
+    const WIDTH: u32 = 720;
+    const HEIGHT: u32 = 480;
 
     let el = winit::event_loop::EventLoop::new();
     let wb = winit::window::WindowBuilder::new()
@@ -67,7 +67,19 @@ pub fn main() {
     // ));
 
     let mut app = app::App::new(WIDTH as _, HEIGHT as _);
-    app.draw();
+    let pixels = {
+        let mut pixels = (0..WIDTH * HEIGHT).map(|i| {
+            let x = (i % WIDTH) as usize;
+            let y = ((i / WIDTH) % HEIGHT) as usize;
+            (x, y)
+        }).collect::<Vec<_>>();
+        use rand::prelude::*;
+        let mut rng = SmallRng::seed_from_u64(0);
+        pixels.shuffle(&mut rng);
+        pixels
+    };
+
+    // app.draw();
 
     let image = graphics::image::Image::with_data(
         &mut ctx,
@@ -96,7 +108,7 @@ pub fn main() {
         graphics::quad_batch::Quad::from(graphics::viewport::Viewport::new(0., 0., 1., 1.)).map(
             |(x, y)| Vertex2D {
                 position: [x, y],
-                uv: [x, y],
+                uv: [x, 1.0 - y],
             },
         ),
     );
@@ -109,6 +121,8 @@ pub fn main() {
     ctx.clear_color(1., 0., 0., 1.);
     ctx.use_shader(Some(&shader));
     ctx.bind_texture_to_unit(image.get_texture_type(), image.get_texture_key(), 0.into());
+
+    let mut pixel_iterator = pixels.into_iter();
 
     el.run(move |e, _, cx| {
         use winit::{event::*, event_loop::ControlFlow};
@@ -129,6 +143,27 @@ pub fn main() {
             },
             Event::MainEventsCleared => window.request_redraw(),
             Event::RedrawRequested(_) => {
+                let mut updated = false;
+                {
+                    let start = instant::Instant::now();
+                    while start.elapsed() < instant::Duration::from_secs_f32(1./30.) {
+                        if let Some((x, y)) = pixel_iterator.next() {
+                            updated = true;
+                            app.draw(x, y);
+                        }
+                    }
+                }
+
+                if updated {
+                    ctx.set_texture_data(image.get_texture_key(), image.get_texture_info(), image.get_texture_type(), Some(unsafe {
+                        let pixels = app.pixels();
+                        std::slice::from_raw_parts(
+                            pixels.as_ptr() as *const u8,
+                            pixels.len() * std::mem::size_of::<raytracer::Pixel>(),
+                        )
+                    }));
+                }
+
                 ctx.clear();
                 quadbatch.draw(&mut ctx);
 

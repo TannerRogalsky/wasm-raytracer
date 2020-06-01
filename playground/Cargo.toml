@@ -20,6 +20,7 @@ raytracer = { path = "../raytracer" }
 rand = { version = "0.7", features = ["small_rng"] }
 cgmath = "0.17"
 graphics = { path = "../../engine-rs/graphics", features = ["derive"] }
+instant = { version = "0.1", features = ["now"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 glutin = "0.24"

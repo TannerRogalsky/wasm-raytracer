@@ -70,30 +70,51 @@ impl App {
         }
     }
 
-    pub fn draw(&mut self) {
-        const AA_STEPS: usize = 1;
-        let width = self.width;
-        let height = self.height;
+    pub fn draw(&mut self, x: usize, y: usize) {
+        // let u = (x as f64) / (self.width as f64);
+        // let v = (y as f64) / (self.height as f64);
+        //
+        // let r = self.camera.ray(&mut self.rng, u, v);
+        // let col = self.color(&r, 0);
+        const AA_STEPS: usize = 50;
+        let col = (0..AA_STEPS).fold(vec3(0.0, 0.0, 0.0), |acc, _i| {
+            let u = (x as f64 + self.rng.gen::<f64>()) / (self.width as f64);
+            let v = (y as f64 + self.rng.gen::<f64>()) / (self.height as f64);
 
-        let mut i = 0usize;
-        for y in (0..height).rev() {
-            for x in 0..width {
-                let col = (0..AA_STEPS).fold(vec3(0.0, 0.0, 0.0), |acc, _i| {
-                    let u = (x as f64 + self.rng.gen::<f64>()) / (width as f64);
-                    let v = (y as f64 + self.rng.gen::<f64>()) / (height as f64);
+            let r = self.camera.ray(&mut self.rng, u, v);
+            acc + self.color(&r, 0)
+        }) / AA_STEPS as f64;
 
-                    let r = self.camera.ray(&mut self.rng, u, v);
-                    acc + self.color(&r, 0)
-                }) / AA_STEPS as f64;
-
-                self.pixels[i].r = (col.x.sqrt() * 255.99) as u8;
-                self.pixels[i].g = (col.y.sqrt() * 255.99) as u8;
-                self.pixels[i].b = (col.z.sqrt() * 255.99) as u8;
-
-                i += 1;
-            }
-        }
+        let i = x + self.width * y;
+        self.pixels[i].r = (col.x.sqrt() * 255.99) as u8;
+        self.pixels[i].g = (col.y.sqrt() * 255.99) as u8;
+        self.pixels[i].b = (col.z.sqrt() * 255.99) as u8;
     }
+
+    // pub fn draw(&mut self) {
+    //     const AA_STEPS: usize = 1;
+    //     let width = self.width;
+    //     let height = self.height;
+    //
+    //     let mut i = 0usize;
+    //     for y in (0..height).rev() {
+    //         for x in 0..width {
+    //             let col = (0..AA_STEPS).fold(vec3(0.0, 0.0, 0.0), |acc, _i| {
+    //                 let u = (x as f64 + self.rng.gen::<f64>()) / (width as f64);
+    //                 let v = (y as f64 + self.rng.gen::<f64>()) / (height as f64);
+    //
+    //                 let r = self.camera.ray(&mut self.rng, u, v);
+    //                 acc + self.color(&r, 0)
+    //             }) / AA_STEPS as f64;
+    //
+    //             self.pixels[i].r = (col.x.sqrt() * 255.99) as u8;
+    //             self.pixels[i].g = (col.y.sqrt() * 255.99) as u8;
+    //             self.pixels[i].b = (col.z.sqrt() * 255.99) as u8;
+    //
+    //             i += 1;
+    //         }
+    //     }
+    // }
 }
 
 fn gen_world<R>(rng: &mut R) -> HitTableList<f64, R>
