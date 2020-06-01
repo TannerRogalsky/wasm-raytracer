@@ -2,4 +2,5 @@
 members = [
     "wasm-executor",
     "playground",
+    "raytracer",
 ]

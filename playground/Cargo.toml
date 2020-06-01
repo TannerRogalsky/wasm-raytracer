@@ -15,4 +15,15 @@ console_error_panic_hook = "0.1"
 wasm-bindgen = "0.2"
 rayon = "1.3"
 simple_logger = "1.6"
+
+raytracer = { path = "../raytracer" }
+rand = { version = "0.7", features = ["small_rng"] }
+cgmath = "0.17"
+graphics = { path = "../../engine-rs/graphics", features = ["derive"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+glutin = "0.24"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
 winit = { version = "0.22", features = ["web-sys"] }
+web-sys = "0.3"
