@@ -13,7 +13,11 @@ pub struct Sphere<T, R> {
 }
 
 impl<T, R> Sphere<T, R> {
-    pub fn new(center: cgmath::Vector3<T>, radius: T, material: Rc<dyn Material<T, R> + Send + Sync>) -> Self {
+    pub fn new(
+        center: cgmath::Vector3<T>,
+        radius: T,
+        material: Rc<dyn Material<T, R> + Send + Sync>,
+    ) -> Self {
         Self {
             center,
             radius,

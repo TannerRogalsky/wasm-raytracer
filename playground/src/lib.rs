@@ -6,15 +6,19 @@ use glutin as winit;
 
 use graphics::texture::{Texture, TextureUpdate};
 use graphics::vertex::Vertex;
-use wasm_bindgen::prelude::*;
+use rand::prelude::*;
 use rayon::prelude::*;
-use rand::prelude::SmallRng;
+use wasm_bindgen::prelude::*;
 
 #[cfg(target_arch = "wasm32")]
 fn build_thread_pool() -> rayon::ThreadPool {
-    let concurrency = web_sys::window().unwrap().navigator().hardware_concurrency() as usize;
+    let concurrency = web_sys::window()
+        .unwrap()
+        .navigator()
+        .hardware_concurrency() as usize;
     let pool = wasm_executor::WorkerPool::new(concurrency).expect("pool creation failed");
-    rayon::ThreadPoolBuilder::new().num_threads(concurrency)
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(concurrency)
         .spawn_handler(move |thread| Ok(pool.run(|| thread.run()).unwrap()))
         .build()
         .unwrap()
@@ -23,7 +27,10 @@ fn build_thread_pool() -> rayon::ThreadPool {
 #[cfg(not(target_arch = "wasm32"))]
 fn build_thread_pool() -> rayon::ThreadPool {
     let concurrency = num_cpus::get();
-    rayon::ThreadPoolBuilder::new().num_threads(concurrency).build().unwrap()
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(concurrency)
+        .build()
+        .unwrap()
 }
 
 #[derive(Vertex, Default, Copy, Clone, Debug)]
@@ -65,12 +72,13 @@ pub fn main() {
 
     let app = app::App::new(WIDTH as _, HEIGHT as _);
     let pixels = {
-        let mut pixels = (0..WIDTH * HEIGHT).map(|i| {
-            let x = (i % WIDTH) as usize;
-            let y = ((i / WIDTH) % HEIGHT) as usize;
-            (x, y)
-        }).collect::<Vec<_>>();
-        use rand::prelude::*;
+        let mut pixels = (0..WIDTH * HEIGHT)
+            .map(|i| {
+                let x = (i % WIDTH) as usize;
+                let y = ((i / WIDTH) % HEIGHT) as usize;
+                (x, y)
+            })
+            .collect::<Vec<_>>();
         let mut rng = SmallRng::seed_from_u64(0);
         pixels.shuffle(&mut rng);
         pixels
@@ -118,15 +126,17 @@ pub fn main() {
     ctx.use_shader(Some(&shader));
     ctx.bind_texture_to_unit(image.get_texture_type(), image.get_texture_key(), 0.into());
 
-
     let (sender, recv) = std::sync::mpsc::channel();
     thread_pool.spawn(move || {
-        pixels.into_par_iter().for_each_with(sender, |sender, (x, y)| {
-            use rand::SeedableRng;
-            let mut rng = SmallRng::seed_from_u64(0);
-            let pixel = app.draw(x, y, &mut rng);
-            sender.send(((x, y), pixel)).expect("failed to send, the main thread is probably dead");
-        });
+        pixels
+            .into_par_iter()
+            .for_each_with(sender, |sender, (x, y)| {
+                let mut rng = SmallRng::seed_from_u64(0);
+                let pixel = app.draw(x, y, &mut rng);
+                sender
+                    .send(((x, y), pixel))
+                    .expect("failed to send, the main thread is probably dead");
+            });
     });
 
     el.run(move |e, _, cx| {
@@ -154,13 +164,18 @@ pub fn main() {
                 }
 
                 if updated {
-                    ctx.set_texture_data(image.get_texture_key(), image.get_texture_info(), image.get_texture_type(), Some(unsafe {
-                        let pixels = &pixel_data;
-                        std::slice::from_raw_parts(
-                            pixels.as_ptr() as *const u8,
-                            pixels.len() * std::mem::size_of::<raytracer::Pixel>(),
-                        )
-                    }));
+                    ctx.set_texture_data(
+                        image.get_texture_key(),
+                        image.get_texture_info(),
+                        image.get_texture_type(),
+                        Some(unsafe {
+                            let pixels = &pixel_data;
+                            std::slice::from_raw_parts(
+                                pixels.as_ptr() as *const u8,
+                                pixels.len() * std::mem::size_of::<raytracer::Pixel>(),
+                            )
+                        }),
+                    );
                 }
 
                 ctx.clear();
